@@ -1,0 +1,49 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Item {
+  id        Int             @id
+  name      String
+  examine   String?
+  members   Boolean         @default(false)
+  lowalch   Int?
+  highalch  Int?
+  buyLimit  Int?
+  icon      String?
+  wikiUrl   String?
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  snapshots PriceSnapshot[]
+  favorites Favorite[]
+
+  @@index([name])
+}
+
+model PriceSnapshot {
+  id        BigInt   @id @default(autoincrement())
+  itemId    Int
+  priceHigh Int
+  priceLow  Int
+  timestamp DateTime @default(now())
+  item      Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([itemId, timestamp(sort: Desc)])
+  @@index([timestamp(sort: Desc)])
+}
+
+model Favorite {
+  id        BigInt   @id @default(autoincrement())
+  profileId String
+  itemId    Int
+  createdAt DateTime @default(now())
+  item      Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@unique([profileId, itemId])
+  @@index([profileId])
+}
