@@ -7,6 +7,10 @@ export type MarketItem = {
   potentialProfit: number;
   favorited: boolean;
   updatedAt: string;
+  highTime?: number;
+  lowTime?: number;
+  volume?: number; 
+  limit?: number;
 };
 
 export type PriceHistoryPoint = {

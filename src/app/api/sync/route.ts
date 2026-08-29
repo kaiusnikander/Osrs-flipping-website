@@ -22,3 +22,11 @@ export async function POST(request: Request) {
   const result = await syncMarketData(force);
   return NextResponse.json(result);
 }
+// Example of how you should be fetching the 5-minute data
+async function fetch5MinuteHistory(itemId: number) {
+  const res = await fetch(`https://prices.runescape.wiki/api/v1/osrs/timeseries?timestep=5m&id=${itemId}`);
+  const json = await res.json();
+  
+  // The Wiki API returns the array inside a "data" property
+  return json.data; 
+}

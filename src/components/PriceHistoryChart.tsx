@@ -18,37 +18,66 @@ type PriceHistoryChartProps = {
   hours?: number;
 };
 
+// Robust helper to parse timestamps from Unix seconds, Unix ms, Date objects, or ISO strings
+function parseTimestamp(raw: unknown): number {
+  if (!raw) return 0;
+  
+  if (typeof raw === "number") {
+    // If in seconds (OSRS Wiki API standard), convert to ms
+    return raw < 10000000000 ? raw * 1000 : raw;
+  }
+
+  if (typeof raw === "string") {
+    // If it's a numeric string like "1720000000"
+    if (/^\d+$/.test(raw)) {
+      const num = Number(raw);
+      return num < 10000000000 ? num * 1000 : num;
+    }
+    // If it's an ISO string like "2026-08-29T12:00:00.000Z"
+    const parsed = new Date(raw).getTime();
+    return isNaN(parsed) ? 0 : parsed;
+  }
+
+  if (raw instanceof Date) {
+    return raw.getTime();
+  }
+
+  return 0;
+}
+
 export function PriceHistoryChart({ data, hours = 24 }: PriceHistoryChartProps) {
-  // 1. Robust data formatting to prevent X-axis crashes
   const chartData = useMemo(() => {
-    const now = Date.now();
-    const hoursMs = hours * 60 * 60 * 1000;
-    const startMs = now - hoursMs;
+    if (!data || data.length === 0) return [];
 
-    return data.map((point, index) => {
-      // Safely resolve the timestamp. If it's completely missing from your API, 
-      // we generate an evenly spaced timeline so the chart still renders perfectly.
-      let timeMs = startMs + (index / Math.max(1, data.length - 1)) * hoursMs;
-      
-      // Handle standard OSRS Wiki timestamps if they exist
-      if ("timestamp" in point && point.timestamp) {
-        timeMs = point.timestamp < 10000000000 ? point.timestamp * 1000 : point.timestamp;
-      }
+    // 1. Map data and resolve prices & timestamps safely
+    const formatted = data.map((point) => {
+      // Check every common timestamp property name
+      // @ts-ignore
+      const rawTime = point.timestamp ?? point.time ?? point.createdAt ?? point.date;
+      const timeMs = parseTimestamp(rawTime);
 
-      // Handle potentially null prices in OSRS API
-      const high = point.high ?? null;
-      const low = point.low ?? null;
+      // Support all common OSRS API price keys
+      // @ts-ignore
+      const highPrice = point.high ?? point.avgHighPrice ?? point.highPrice ?? null;
+      // @ts-ignore
+      const lowPrice = point.low ?? point.avgLowPrice ?? point.lowPrice ?? null;
 
       return {
         ...point,
         timeMs,
-        Instabuy: high,
-        Instasell: low,
+        Instabuy: highPrice !== null ? Number(highPrice) : null,
+        Instasell: lowPrice !== null ? Number(lowPrice) : null,
       };
     });
-  }, [data, hours]);
 
-  if (chartData.length === 0) {
+    // 2. Filter out any points with invalid timestamps (NaN/0)
+    const validData = formatted.filter((p) => p.timeMs > 0);
+
+    // 3. MUST be sorted ascending for Recharts X-axis to render lines
+    return validData.sort((a, b) => a.timeMs - b.timeMs);
+  }, [data]);
+
+  if (!chartData || chartData.length === 0) {
     return (
       <div className="flex h-[350px] w-full items-center justify-center rounded-xl border border-zinc-300 bg-white text-sm text-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400">
         No chart data yet. Press &quot;Refresh data from OSRS Wiki&quot; first.
@@ -58,19 +87,14 @@ export function PriceHistoryChart({ data, hours = 24 }: PriceHistoryChartProps) 
 
   return (
     <div className="relative h-[400px] w-full rounded-xl border border-zinc-300 bg-white p-4 pt-6 font-sans dark:border-zinc-700 dark:bg-zinc-900">
-      {/* Reset Zoom button positioned identically to the reference image */}
-      <button className="absolute right-4 top-4 z-10 rounded bg-[#ffcc99] px-3 py-1 text-xs font-bold text-black transition-colors hover:bg-[#ffb870]">
-        Reset Zoom
-      </button>
-
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-          {/* Subtle grid lines */}
-          <CartesianGrid stroke="#52525b" vertical={true} horizontal={true} strokeOpacity={0.4} />
-          
+        <LineChart data={chartData} margin={{ top: 10, right: 20, left: 10, bottom: 10 }}>
+          <CartesianGrid stroke="#3f3f46" vertical={true} horizontal={true} strokeOpacity={0.4} />
+
           <XAxis
             dataKey="timeMs"
             type="number"
+            scale="time"
             domain={["dataMin", "dataMax"]}
             tickFormatter={(tick) => {
               const date = new Date(tick);
@@ -82,30 +106,30 @@ export function PriceHistoryChart({ data, hours = 24 }: PriceHistoryChartProps) 
             }}
             stroke="#71717a"
             tick={{ fill: "#a1a1aa", fontSize: 12 }}
-            tickMargin={12}
+            tickMargin={10}
             minTickGap={40}
           />
-          
+
           <YAxis
             domain={["auto", "auto"]}
-            tickFormatter={(tick) => tick.toLocaleString()}
+            tickFormatter={(tick) => Number(tick).toLocaleString()}
             stroke="#71717a"
             tick={{ fill: "#a1a1aa", fontSize: 12 }}
-            tickMargin={12}
+            tickMargin={10}
             width={85}
           />
-          
+
           <Tooltip
             contentStyle={{
-              backgroundColor: "#27272a", // zinc-800
-              borderColor: "#3f3f46", // zinc-700
-              color: "#f4f4f5", // zinc-100
+              backgroundColor: "#27272a",
+              borderColor: "#3f3f46",
+              color: "#f4f4f5",
               borderRadius: "6px",
             }}
             itemStyle={{ color: "#fff", fontWeight: "bold" }}
-            labelFormatter={(label) => new Date(label).toLocaleString()}
+            labelFormatter={(label) => (label ? new Date(Number(label)).toLocaleString() : "")}
           />
-          
+
           <Legend
             verticalAlign="top"
             align="left"
@@ -113,24 +137,24 @@ export function PriceHistoryChart({ data, hours = 24 }: PriceHistoryChartProps) 
             iconType="circle"
             wrapperStyle={{ fontSize: "14px", color: "#d4d4d8" }}
           />
-          
+
           <Line
-            type="linear"
+            type="stepAfter"
             dataKey="Instabuy"
-            stroke="#22c55e" // Green
+            stroke="#22c55e"
             strokeWidth={2}
-            dot={{ r: 3, fill: "#22c55e", strokeWidth: 0 }}
+            dot={{ r: 2, fill: "#22c55e", strokeWidth: 0 }}
             activeDot={{ r: 5 }}
             isAnimationActive={false}
-            connectNulls={true} // CRITICAL: bridges gaps if OSRS items have missing data periods
+            connectNulls={true}
           />
-          
+
           <Line
-            type="linear"
+            type="stepAfter"
             dataKey="Instasell"
-            stroke="#f97316" // Orange
+            stroke="#f97316"
             strokeWidth={2}
-            dot={{ r: 3, fill: "#f97316", strokeWidth: 0 }}
+            dot={{ r: 2, fill: "#f97316", strokeWidth: 0 }}
             activeDot={{ r: 5 }}
             isAnimationActive={false}
             connectNulls={true}

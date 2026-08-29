@@ -32,6 +32,41 @@ async function hasFreshData(): Promise<boolean> {
   return latestSnapshot.timestamp > staleThreshold;
 }
 
+
+export interface CalculatedFlipItem extends MarketItem {
+  tax: number;
+  margin: number;
+  roi: number;
+  potentialProfit: number;
+}
+
+export function calculateFlipMetrics(item: MarketItem): CalculatedFlipItem | null {
+  const high = item.high ?? 0;
+  const low = item.low ?? 0;
+
+  // Items must have both buy and sell prices to calculate a flip
+  if (high <= 0 || low <= 0 || high <= low) {
+    return null;
+  }
+
+  // OSRS 1% tax rounded down, capped at 5M GP
+  const tax = Math.min(5_000_000, Math.floor(high * 0.01));
+  const margin = high - tax - low;
+  const roi = (margin / low) * 100;
+
+  // Potential profit per 4-hour buy limit window
+  const buyLimit = item.limit ?? 1;
+  const potentialProfit = margin * buyLimit;
+
+  return {
+    ...item,
+    tax,
+    margin,
+    roi,
+    potentialProfit,
+  };
+}
+
 export async function syncMarketData(force = false): Promise<{
   updatedItems: number;
   createdSnapshots: number;
