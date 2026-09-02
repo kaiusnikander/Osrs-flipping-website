@@ -10,12 +10,13 @@ export async function GET(request: Request) {
       where: {
         name: {
           contains: query,
-        }
+          mode: "insensitive",
+        },
       },
-      // Sort by volume so the best, most actively traded items load first
-      orderBy: { volume: "desc" },
+      // Keep the results stable and readable while still limiting the response size
+      orderBy: { name: "asc" },
       // Cap it at 500 items so the browser doesn't lag rendering a massive table
-      take: 500, 
+      take: 500,
     });
 
     return NextResponse.json({ items });
