@@ -190,7 +190,7 @@ export async function searchMarketItems(
   });
 
   return items
-    .map((item) => {
+    .map((item): MarketItem | null => {
       const latest = item.snapshots[0];
       if (!latest) {
         return null;
@@ -208,7 +208,7 @@ export async function searchMarketItems(
         updatedAt: latest.timestamp.toISOString(),
       };
     })
-    .filter((item): item is NonNullable<typeof item> => item !== null)
+    .filter((item): item is MarketItem => item !== null)
     .sort((left, right) => right.potentialProfit - left.potentialProfit);
 }
 
@@ -228,11 +228,13 @@ export async function getPriceHistory(
     take: 400,
   });
 
-  return snapshots.map((snapshot) => ({
-    timestamp: snapshot.timestamp.toISOString(),
-    high: snapshot.priceHigh,
-    low: snapshot.priceLow,
-  }));
+  return snapshots.map(
+    (snapshot): PriceHistoryPoint => ({
+      timestamp: snapshot.timestamp.toISOString(),
+      high: snapshot.priceHigh,
+      low: snapshot.priceLow,
+    }),
+  );
 }
 
 export async function setFavorite(
@@ -284,7 +286,7 @@ export async function getFavoriteItems(profileId: string): Promise<FavoriteItem[
   });
 
   return favorites
-    .map((favorite) => {
+    .map((favorite): FavoriteItem | null => {
       const latest = favorite.item.snapshots[0];
       if (!latest) {
         return null;
@@ -300,5 +302,5 @@ export async function getFavoriteItems(profileId: string): Promise<FavoriteItem[
         potentialProfit: calculatePotentialProfit(latest.priceLow, latest.priceHigh),
       };
     })
-    .filter((favorite): favorite is NonNullable<typeof favorite> => favorite !== null);
+    .filter((favorite): favorite is FavoriteItem => favorite !== null);
 }
