@@ -190,26 +190,55 @@ export async function searchMarketItems(
   });
 
   return items
-    .map((item) => {
-      const latest = item.snapshots[0];
-      if (!latest) {
-        return null;
-      }
+    .map(
+      (item: {
+        id: number;
+        name: string;
+        snapshots: Array<{ timestamp: Date; priceHigh: number; priceLow: number }>;
+        favorites: Array<{ id: bigint | number }>;
+      }) => {
+        const latest = item.snapshots[0];
+        if (!latest) {
+          return null;
+        }
 
-      const margin = latest.priceHigh - latest.priceLow;
-      return {
-        itemId: item.id,
-        name: item.name,
-        high: latest.priceHigh,
-        low: latest.priceLow,
-        margin,
-        potentialProfit: calculatePotentialProfit(latest.priceLow, latest.priceHigh),
-        favorited: item.favorites.length > 0,
-        updatedAt: latest.timestamp.toISOString(),
-      };
-    })
-    .filter((item): item is NonNullable<typeof item> => item !== null)
-    .sort((left, right) => right.potentialProfit - left.potentialProfit);
+        const margin = latest.priceHigh - latest.priceLow;
+        return {
+          itemId: item.id,
+          name: item.name,
+          high: latest.priceHigh,
+          low: latest.priceLow,
+          margin,
+          potentialProfit: calculatePotentialProfit(latest.priceLow, latest.priceHigh),
+          favorited: item.favorites.length > 0,
+          updatedAt: latest.timestamp.toISOString(),
+        };
+      },
+    )
+    .filter(
+      (
+        item: {
+          itemId: number;
+          name: string;
+          high: number;
+          low: number;
+          margin: number;
+          potentialProfit: number;
+          favorited: boolean;
+          updatedAt: string;
+        } | null,
+      ): item is {
+        itemId: number;
+        name: string;
+        high: number;
+        low: number;
+        margin: number;
+        potentialProfit: number;
+        favorited: boolean;
+        updatedAt: string;
+      } => item !== null,
+    )
+    .sort((left: MarketItem, right: MarketItem) => right.potentialProfit - left.potentialProfit);
 }
 
 export async function getPriceHistory(
@@ -228,11 +257,13 @@ export async function getPriceHistory(
     take: 400,
   });
 
-  return snapshots.map((snapshot) => ({
-    timestamp: snapshot.timestamp.toISOString(),
-    high: snapshot.priceHigh,
-    low: snapshot.priceLow,
-  }));
+  return snapshots.map(
+    (snapshot: { timestamp: Date; priceHigh: number; priceLow: number }) => ({
+      timestamp: snapshot.timestamp.toISOString(),
+      high: snapshot.priceHigh,
+      low: snapshot.priceLow,
+    }),
+  );
 }
 
 export async function setFavorite(
@@ -284,21 +315,47 @@ export async function getFavoriteItems(profileId: string): Promise<FavoriteItem[
   });
 
   return favorites
-    .map((favorite) => {
-      const latest = favorite.item.snapshots[0];
-      if (!latest) {
-        return null;
-      }
+    .map(
+      (favorite: {
+        itemId: number;
+        item: {
+          name: string;
+          snapshots: Array<{ timestamp: Date; priceHigh: number; priceLow: number }>;
+        };
+      }) => {
+        const latest = favorite.item.snapshots[0];
+        if (!latest) {
+          return null;
+        }
 
-      const margin = latest.priceHigh - latest.priceLow;
-      return {
-        itemId: favorite.itemId,
-        name: favorite.item.name,
-        high: latest.priceHigh,
-        low: latest.priceLow,
-        margin,
-        potentialProfit: calculatePotentialProfit(latest.priceLow, latest.priceHigh),
-      };
-    })
-    .filter((favorite): favorite is NonNullable<typeof favorite> => favorite !== null);
+        const margin = latest.priceHigh - latest.priceLow;
+        return {
+          itemId: favorite.itemId,
+          name: favorite.item.name,
+          high: latest.priceHigh,
+          low: latest.priceLow,
+          margin,
+          potentialProfit: calculatePotentialProfit(latest.priceLow, latest.priceHigh),
+        };
+      },
+    )
+    .filter(
+      (
+        favorite: {
+          itemId: number;
+          name: string;
+          high: number;
+          low: number;
+          margin: number;
+          potentialProfit: number;
+        } | null,
+      ): favorite is {
+        itemId: number;
+        name: string;
+        high: number;
+        low: number;
+        margin: number;
+        potentialProfit: number;
+      } => favorite !== null,
+    );
 }
